@@ -24,27 +24,41 @@ class Navigation(Node):
     def __init__(self):
         super().__init__('navigation')
 
+        # A reentrant callback group allows multiple callbacks to be executed concurrently, 
+        # this is neccessary as the plan and control callbacks run at different frequencies.
+
         self.callback_group = ReentrantCallbackGroup()
+
+        # The plan callback runs at a lower frequency than the control callback
         self.plan_timer = self.create_timer(1.0, self.plan_callback, callback_group=self.callback_group)
+        # The control callback runs at a higher frequency than the plan callback
         self.control_timer = self.create_timer(0.1, self.control_callback, callback_group=self.callback_group)
+        # Initialize the current path to None
         self.current_path = None
+
         self.point_subscription = self.create_subscription(
             LaserScan,
             'scan',
             self.scan_callback,
             10,
         )
+
         self.occupancy_grid = np.zeros((10, 10), dtype=np.int8)
 
+        # Initialize the TF buffer and listener to get the robot's pose in the world frame
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
+        # Initialize the LaserProjection object to convert laser scans to point clouds
         self.projector = LaserProjection()
+
         self.targets = []
         self.all_targets = []
         self.path_taken = []
 
         self.cmd_vel_publisher = self.create_publisher(TwistStamped, 'diff_drive_controller/cmd_vel', 10)
 
+        #CONSTANTS (SHOULD USE ALL CAPS FOR CONSTANTS BUT I FORGOT)
         self.grid_scale = 1
         self.grid_offset = 5
 
@@ -100,6 +114,8 @@ class Navigation(Node):
             return
 
         path = self.astar(self.occupancy_grid, robot_cell, goal_cell)
+
+        # If a path is found, set it as the current path. If not, log a warning and set the current path to None.
         if path:
             self.current_path = path[1:] if len(path) > 1 else path
         else:
@@ -170,9 +186,11 @@ class Navigation(Node):
         yaw = self.yaw_from_quaternion(transform.transform.rotation)
         return (x, y, yaw)
 
+    #transform the world coordinates to grid coordinates by scaling and offsetting the x and y values.
     def world_to_grid(self, x, y):
         return (int(x * self.grid_scale) + self.grid_offset, int(y * self.grid_scale) + self.grid_offset)
 
+    #transform the grid coordinates to world coordinates by reversing the scaling and offsetting of the x and y values.
     def grid_to_world(self, cell):
         return ((cell[0] - self.grid_offset) / self.grid_scale, (cell[1] - self.grid_offset) / self.grid_scale)
 
@@ -190,6 +208,13 @@ class Navigation(Node):
     @staticmethod
     def distance(a, b):
         return math.hypot(a[0] - b[0], a[1] - b[1])
+
+    # The compute_control method calculates the linear and angular velocities needed to follow the given path.
+    # It first checks if the path is empty, and if so, returns a zero Twist message. 
+    # It then gets the robot's current pose and drops any waypoints that have already been reached
+    # It calculates the distance and angle to the next waypoint, and uses proportional control to compute the desired linear and angular speeds.
+    # It also applies acceleration limits to avoid sudden changes in speed, and updates the last linear and angular speeds for the next control cycle. 
+    # Finally, it returns the computed Twist message.
 
     def compute_control(self, path):
         twist = Twist()
@@ -219,8 +244,8 @@ class Navigation(Node):
         desired_angular = max(-self.max_angular_speed, min(self.max_angular_speed, self.k_angular * angle_error))
 
         # Ramp toward the desired speeds instead of snapping to them, so a
-        # noisy/jumpy angle_error can't fling the robot from full-speed one
-        # way to full-speed the other way in a single control tick.
+        # noisy/jumpy angle_error can't fling the robot from full-speed one way to 
+        # full-speed the other way in a single control tick.
         max_dv = self.max_linear_accel * self.control_period
         max_dw = self.max_angular_accel * self.control_period
         twist.linear.x = self.last_linear_speed + max(-max_dv, min(max_dv, desired_linear - self.last_linear_speed))
@@ -230,6 +255,11 @@ class Navigation(Node):
         self.last_angular_speed = twist.angular.z
 
         return twist
+
+    # The astar method implements the A* pathfinding algorithm to find a path from the start cell to the goal cell in the occupancy grid.
+    # It uses a priority queue to explore the cells with the lowest estimated cost first, and keeps track of the cells that have already been visited and the best path to each cell.
+    # It returns the path as a list of cells from the start to the goal, or None if no path is found. The heuristic used is the Manhattan distance between the current cell and the goal cell, 
+    # which is appropriate for a grid-based environment where movement is restricted to horizontal and vertical directions
 
     def astar(self, occupancy_grid, start, goal):
         rows, cols = occupancy_grid.shape
@@ -270,7 +300,7 @@ class Navigation(Node):
 
         return None
 
-
+# Generate random targets on the occupancy grid
 def generate_targets(self, targets):
     for _ in range(targets):
         x_idx = random.randint(0, self.occupancy_grid.shape[0] - 1)
@@ -278,6 +308,8 @@ def generate_targets(self, targets):
         self.targets.append((x_idx, y_idx))
         self.all_targets.append((x_idx, y_idx))
 
+# The plot_occupancy_grid function visualizes the occupancy grid,
+# the path taken by the robot, and the target locations using matplotlib.
 
 def plot_occupancy_grid(occupancy_grid, path_taken=None, targets=None):
     plt.imshow(occupancy_grid, cmap='gray', origin='lower')

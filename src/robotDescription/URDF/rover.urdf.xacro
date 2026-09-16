@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+
+<robot name="rover" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:include filename="$(find robotDescription)/URDF/common_properties.xacro"/>
+  <xacro:include filename="$(find robotDescription)/URDF/materials.xacro"/>
+  <xacro:include filename="$(find robotDescription)/URDF/inertial_macros.xacro"/>
+  <xacro:include filename="$(find robotDescription)/URDF/chassis.xacro"/>
+  <xacro:include filename="$(find robotDescription)/URDF/wheel.xacro"/>
+  <xacro:include filename="$(find robotDescription)/URDF/lidar.xacro"/>
+
+  <!-- Passive front wheels -->
+  <xacro:rover_wheel prefix="front_left"  x="${wheelbase/2}"  y="${track_width/2}"  z="0"/>
+  <xacro:rover_wheel prefix="front_right" x="${wheelbase/2}"  y="${-track_width/2}" z="0"/>
+
+  <!-- Driven rear wheels -->
+  <xacro:rover_wheel prefix="rear_left"   x="${-wheelbase/2}" y="${track_width/2}"  z="0"/>
+  <xacro:rover_wheel prefix="rear_right"  x="${-wheelbase/2}" y="${-track_width/2}" z="0"/>
+
+  <xacro:include filename="$(find robotDescription)/URDF/ros2_control.xacro"/>
+  <xacro:include filename="$(find robotDescription)/URDF/gazebo.xacro"/>
+
+</robot>
